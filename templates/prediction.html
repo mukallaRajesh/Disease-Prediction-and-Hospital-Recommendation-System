@@ -12,7 +12,7 @@
         <div class="prediction-header">
             <i class="fas fa-stethoscope"></i>
             <h2>Disease Prediction</h2>
-            <p>Select your symptoms to get an AI-powered prediction</p>
+            <p>Select your symptoms to get an AI-powered prediction, doctor recommendation, and nearby hospitals</p>
         </div>
         
         <div class="input-section">
@@ -34,6 +34,25 @@
                 </div>
                 <small class="form-text">Select at least 3 symptoms</small>
             </div>
+
+            <div class="form-group" style="margin-top: 1rem;">
+                <label for="predictCitySelect">
+                    <i class="fas fa-location-dot" style="color: var(--primary-color); margin-right: 4px;"></i>
+                    Your City <span style="font-size: 0.85rem; opacity: 0.75; font-weight: 400;">(Optional - for Hospital Recommendations)</span>
+                </label>
+                <div class="input-group">
+                    <span class="input-icon">
+                        <i class="fas fa-city"></i>
+                    </span>
+                    <select id="predictCitySelect" class="form-control">
+                        <option value="">Select your city or leave blank...</option>
+                        {% for c in cities %}
+                        <option value="{{ c }}">{{ c }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
             <button onclick="predictDisease()" class="predict-btn">
                 <span>Get Prediction</span>
                 <i class="fas fa-search"></i>
@@ -59,7 +78,7 @@
         border-radius: 20px;
         padding: 2.5rem;
         width: 100%;
-        max-width: 600px;
+        max-width: 780px;
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
         border: 1px solid rgba(255, 255, 255, 0.2);
         animation: fadeIn 0.5s ease-out;
@@ -210,62 +229,285 @@
 
     .result-section h3 {
         color: var(--text-color);
-        margin-bottom: 1rem;
+        margin-bottom: 1.5rem;
         font-weight: 600;
-    }
-
-    .result-section p {
-        color: var(--text-color);
-        margin-bottom: 0.5rem;
-        line-height: 1.6;
-    }
-
-    .result-section strong {
-        color: var(--primary-color);
-    }
-
-    .result-section hr {
-        border: none;
-        border-top: 1px solid rgba(0, 0, 0, 0.1);
-        margin: 1.5rem 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
     }
 
     .disease-card {
         background: rgba(255, 255, 255, 0.05);
-        border-radius: 10px;
-        padding: 1.5rem;
-        margin-bottom: 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 16px;
+        padding: 1.75rem;
+        margin-bottom: 1.75rem;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        transition: transform 0.2s ease;
     }
 
-    .disease-card h4 {
+    .disease-card:hover {
+        transform: translateY(-2px);
+    }
+
+    .disease-card-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .disease-title {
         color: var(--primary-color);
-        margin-bottom: 0.5rem;
+        margin: 0;
+        font-size: 1.4rem;
+        font-weight: 700;
     }
 
     .probability-badge {
-        display: inline-block;
+        display: inline-flex;
+        align-items: center;
         background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
         color: white;
-        padding: 0.3rem 0.8rem;
+        padding: 0.35rem 0.9rem;
         border-radius: 20px;
         font-size: 0.9rem;
+        font-weight: 600;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    }
+
+    .disease-overview {
+        background: rgba(255, 255, 255, 0.04);
+        border-radius: 10px;
+        padding: 1rem;
+        margin-bottom: 1.25rem;
+        border-left: 3px solid var(--primary-color);
+    }
+
+    .disease-overview p {
         margin-bottom: 0.5rem;
+        color: var(--text-color);
+        line-height: 1.55;
+        font-size: 0.95rem;
+    }
+
+    .disease-overview p:last-child {
+        margin-bottom: 0;
+    }
+
+    /* Specialist Card */
+    .specialist-box {
+        background: rgba(33, 150, 243, 0.08);
+        border: 1px solid rgba(33, 150, 243, 0.25);
+        border-radius: 14px;
+        padding: 1.25rem;
+        margin-bottom: 1.25rem;
+    }
+
+    .specialist-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 0.9rem;
+    }
+
+    .specialist-icon-circle {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--secondary-color), var(--primary-color));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.2rem;
+        flex-shrink: 0;
+        box-shadow: 0 4px 10px rgba(33, 150, 243, 0.3);
+    }
+
+    .section-label {
+        display: block;
+        font-size: 0.72rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-weight: 700;
+        color: var(--secondary-color);
+        opacity: 0.9;
+        margin-bottom: 2px;
+    }
+
+    .specialist-title {
+        margin: 0;
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: var(--text-color);
+    }
+
+    .specialist-info-row {
+        display: flex;
+        gap: 0.75rem;
+        align-items: flex-start;
+        margin-top: 0.6rem;
+        font-size: 0.92rem;
+        line-height: 1.5;
+        color: var(--text-color);
+    }
+
+    .specialist-info-row i {
+        color: var(--secondary-color);
+        margin-top: 3px;
+        font-size: 0.95rem;
+        flex-shrink: 0;
+    }
+
+    /* Hospitals Card */
+    .hospitals-box {
+        background: rgba(76, 175, 80, 0.07);
+        border: 1px solid rgba(76, 175, 80, 0.22);
+        border-radius: 14px;
+        padding: 1.25rem;
+    }
+
+    .hospitals-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-weight: 700;
+        font-size: 1rem;
+        color: var(--text-color);
+        margin-bottom: 1rem;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .city-pill {
+        font-size: 0.8rem;
+        background: rgba(76, 175, 80, 0.2);
+        color: var(--primary-color);
+        padding: 0.2rem 0.65rem;
+        border-radius: 20px;
+        font-weight: 600;
+    }
+
+    .hospital-item {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 10px;
+        padding: 0.9rem 1rem;
+        margin-bottom: 0.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+        transition: all 0.2s ease;
+    }
+
+    .hospital-item:hover {
+        background: rgba(255, 255, 255, 0.15);
+        transform: translateY(-1px);
+    }
+
+    .hospital-item-main {
+        flex: 1 1 280px;
+    }
+
+    .hospital-name {
+        font-size: 0.98rem;
+        color: var(--text-color);
+        margin-bottom: 0.25rem;
+    }
+
+    .hospital-address {
+        font-size: 0.85rem;
+        color: var(--text-color);
+        opacity: 0.85;
+        margin-bottom: 0.4rem;
+        line-height: 1.4;
+    }
+
+    .hospital-meta {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .meta-tag {
+        font-size: 0.75rem;
+        padding: 0.15rem 0.5rem;
+        border-radius: 6px;
+        background: rgba(0, 0, 0, 0.05);
+        color: var(--text-color);
+        opacity: 0.85;
+    }
+
+    .directions-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.45rem 0.9rem;
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        color: white;
+        border-radius: 8px;
+        text-decoration: none;
+        font-size: 0.85rem;
+        font-weight: 600;
+        white-space: nowrap;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .directions-btn:hover {
+        color: white;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+    }
+
+    .no-hospitals-hint {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.85rem 1rem;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 10px;
+        font-size: 0.9rem;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        color: var(--text-color);
+    }
+
+    .location-link-btn {
+        font-size: 0.82rem;
+        padding: 0.35rem 0.75rem;
+        border-radius: 6px;
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        color: white !important;
+        text-decoration: none;
+        font-weight: 600;
+        transition: all 0.2s;
+    }
+
+    .location-link-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
     }
 
     .loading-state {
         text-align: center;
-        padding: 2rem;
+        padding: 2.5rem 1rem;
         color: var(--text-color);
     }
 
     .loading-state i {
-        font-size: 2rem;
+        font-size: 2.5rem;
         color: var(--primary-color);
         margin-bottom: 1rem;
     }
 
     .error-message {
         background: rgba(244, 67, 54, 0.1);
+        border: 1px solid rgba(244, 67, 54, 0.3);
         border-radius: 10px;
         padding: 1rem;
         color: #f44336;
@@ -285,70 +527,40 @@
         }
     }
 
-    @media (max-width: 480px) {
+    @media (max-width: 600px) {
         .prediction-card {
-            padding: 2rem;
+            padding: 1.5rem;
         }
-    }
-
-    /* Add these new styles for Select2 */
-    .select2-container--default .select2-selection--multiple {
-        background-color: var(--background-color);
-        border: 2px solid rgba(0, 0, 0, 0.1);
-        border-radius: 10px;
-        min-height: 120px;
-        padding: 0.5rem;
-    }
-
-    .select2-container--default .select2-selection--multiple .select2-selection__choice {
-        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-        border: none;
-        border-radius: 20px;
-        padding: 0.3rem 0.8rem;
-        margin: 0.3rem;
-    }
-
-    .select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
-        color: white;
-        margin-right: 0.5rem;
-    }
-
-    .select2-container--default .select2-selection--multiple .select2-selection__choice__remove:hover {
-        color: white;
-        opacity: 0.8;
-    }
-
-    .select2-container--default .select2-search--inline .select2-search__field {
-        margin-top: 0.5rem;
-        padding: 0.5rem;
-        color: var(--text-color);
-    }
-
-    .select2-dropdown {
-        background-color: var(--background-color);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        border-radius: 10px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    }
-
-    .select2-container--default .select2-results__option--highlighted[aria-selected] {
-        background-color: var(--primary-color);
-        color: white;
-    }
-
-    .select2-container--default .select2-results__option {
-        padding: 0.5rem 1rem;
-        color: var(--text-color);
-    }
-
-    .select2-container--default .select2-results__option[aria-selected=true] {
-        background-color: var(--secondary-color);
-        color: white;
+        .hospital-item {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .directions-btn {
+            width: 100%;
+            justify-content: center;
+        }
     }
 </style>
 
 <script>
     let selectedSymptomsList = [];
+
+    // Initialize City from localStorage if already saved
+    document.addEventListener("DOMContentLoaded", function() {
+        const savedCity = localStorage.getItem('user_city');
+        const citySelect = document.getElementById('predictCitySelect');
+        if (savedCity && citySelect) {
+            citySelect.value = savedCity;
+        }
+
+        if (citySelect) {
+            citySelect.addEventListener('change', function() {
+                if (this.value) {
+                    localStorage.setItem('user_city', this.value);
+                }
+            });
+        }
+    });
 
     document.getElementById('symptomsSelect').addEventListener('change', function() {
         const selectedValue = this.value;
@@ -380,12 +592,15 @@
             return;
         }
 
+        const citySelect = document.getElementById("predictCitySelect");
+        const cityValue = (citySelect ? citySelect.value.trim() : "") || localStorage.getItem('user_city') || "";
+
         // Show loading state
         const resultDiv = document.getElementById("predictionResult");
         resultDiv.innerHTML = `
             <div class="loading-state">
                 <i class="fas fa-spinner fa-spin"></i>
-                <p>Analyzing symptoms...</p>
+                <p>Analyzing symptoms with voting ensemble & querying hospital directory...</p>
             </div>
         `;
 
@@ -394,38 +609,147 @@
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({ symptoms: selectedSymptomsList })
+            body: JSON.stringify({
+                symptoms: selectedSymptomsList,
+                city: cityValue
+            })
         })
         .then(response => response.json())
         .then(data => {
-            resultDiv.innerHTML = "<h3>Predicted Diseases:</h3>";
-
             if (data.error) {
-                resultDiv.innerHTML += `
+                resultDiv.innerHTML = `
                     <div class="error-message">
                         <i class="fas fa-exclamation-circle"></i>
                         <p>${data.error}</p>
                     </div>`;
-            } else {
-                data.forEach(disease => {
-                    resultDiv.innerHTML += `
-                        <div class="disease-card">
-                            <h4>${disease.Disease}</h4>
-                            <div class="probability-badge">
-                                ${disease.Chances.toFixed(2)}% probability
-                            </div>
-                            <p><strong>Specialist:</strong> ${disease.Specialist}</p>
-                            <p><strong>Description:</strong> ${disease.Description}</p>
-                        </div>
-                        <hr>`;
-                });
+                return;
             }
+
+            resultDiv.innerHTML = `
+                <h3>
+                    <i class="fas fa-notes-medical" style="color: var(--primary-color);"></i>
+                    Prediction Results & Recommendations
+                </h3>
+            `;
+
+            data.forEach(disease => {
+                // Build Hospitals List HTML
+                let hospitalsHtml = "";
+                if (disease.Hospitals && disease.Hospitals.length > 0) {
+                    const hospitalCards = disease.Hospitals.map(h => {
+                        const query = encodeURIComponent(`${h.Hospital} ${h.Address} ${h.City}`);
+                        return `
+                            <div class="hospital-item">
+                                <div class="hospital-item-main">
+                                    <div class="hospital-name">
+                                        <i class="fas fa-hospital text-success me-2"></i>
+                                        <strong>${h.Hospital}</strong>
+                                    </div>
+                                    <div class="hospital-address">
+                                        <i class="fas fa-map-pin me-1 text-muted"></i>
+                                        ${h.Address || 'Healthcare Facility'}
+                                    </div>
+                                    <div class="hospital-meta">
+                                        <span class="meta-tag"><i class="fas fa-city me-1"></i>${h.City}${h.State ? ', ' + h.State : ''}</span>
+                                        ${h.Pincode ? `<span class="meta-tag"><i class="fas fa-location-crosshairs me-1"></i>PIN: ${h.Pincode}</span>` : ''}
+                                    </div>
+                                </div>
+                                <a href="https://www.google.com/maps/search/?api=1&query=${query}" target="_blank" rel="noopener noreferrer" class="directions-btn">
+                                    <i class="fas fa-diamond-turn-right"></i> Directions
+                                </a>
+                            </div>
+                        `;
+                    }).join('');
+
+                    hospitalsHtml = `
+                        <p style="font-size: 0.88rem; opacity: 0.85; margin-bottom: 0.85rem;">
+                            Nearby healthcare facilities from verified Indian Hospital directory:
+                        </p>
+                        ${hospitalCards}
+                    `;
+                } else {
+                    hospitalsHtml = `
+                        <div class="no-hospitals-hint">
+                            <div>
+                                <i class="fas fa-circle-info text-primary me-2"></i>
+                                <span>${disease.City ? `No hospital matches found in "${disease.City}". Explore our complete directory:` : 'Select your city to view nearby hospitals, or search all 1,300+ Indian hospitals:'}</span>
+                            </div>
+                            <a href="/location" class="location-link-btn">
+                                <i class="fas fa-location-dot me-1"></i> Hospital Directory
+                            </a>
+                        </div>
+                    `;
+                }
+
+                resultDiv.innerHTML += `
+                    <div class="disease-card">
+                        <div class="disease-card-header">
+                            <div>
+                                <h4 class="disease-title">${disease.Disease}</h4>
+                            </div>
+                            <div class="probability-badge">
+                                <i class="fas fa-chart-pie me-1"></i> ${disease.Chances.toFixed(2)}% probability
+                            </div>
+                        </div>
+
+                        <div class="disease-overview">
+                            <p>
+                                <strong><i class="fas fa-circle-info text-primary me-1"></i>Description:</strong>
+                                ${disease.Description}
+                            </p>
+                            <p>
+                                <strong><i class="fas fa-apple-whole text-success me-1"></i>Diet Guidance:</strong>
+                                ${disease['Diet Recommendation'] || 'Maintain a balanced, nutritious diet and stay well hydrated.'}
+                            </p>
+                        </div>
+
+                        <!-- Doctor / Specialist Recommendation -->
+                        <div class="specialist-box">
+                            <div class="specialist-header">
+                                <div class="specialist-icon-circle">
+                                    <i class="fas ${disease.Specialist_Icon || 'fa-user-doctor'}"></i>
+                                </div>
+                                <div>
+                                    <span class="section-label">Doctor / Specialist Recommendation</span>
+                                    <h5 class="specialist-title">${disease.Specialist}</h5>
+                                </div>
+                            </div>
+                            <div class="specialist-info-row">
+                                <i class="fas fa-stethoscope"></i>
+                                <div>
+                                    <strong>Specialist Expertise:</strong>
+                                    ${disease.Specialist_Role || 'Medical specialist qualified in diagnosing and treating conditions in this field.'}
+                                </div>
+                            </div>
+                            <div class="specialist-info-row">
+                                <i class="fas fa-calendar-check"></i>
+                                <div>
+                                    <strong>When to Consult:</strong>
+                                    ${disease.Specialist_Advice || 'Consult promptly for diagnosis, clinical evaluation, and personalized therapy.'}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Hospital Recommendation System -->
+                        <div class="hospitals-box">
+                            <div class="hospitals-header">
+                                <div>
+                                    <i class="fas fa-hospital me-2" style="color: var(--primary-color);"></i>
+                                    <span>Hospital Recommendation System</span>
+                                </div>
+                                ${disease.City ? `<span class="city-pill"><i class="fas fa-location-dot me-1"></i>${disease.City}</span>` : ''}
+                            </div>
+                            ${hospitalsHtml}
+                        </div>
+                    </div>
+                `;
+            });
         })
         .catch(error => {
             resultDiv.innerHTML = `
                 <div class="error-message">
                     <i class="fas fa-exclamation-circle"></i>
-                    <p>An error occurred. Please try again.</p>
+                    <p>An error occurred while predicting. Please try again.</p>
                 </div>`;
             console.error("Error:", error);
         });

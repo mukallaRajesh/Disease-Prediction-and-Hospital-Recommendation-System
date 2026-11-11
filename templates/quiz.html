@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Health Quiz Center{% endblock %}
+
+{% block content %}
+
+<div class="container py-5">
+
+    <div class="text-center mb-5">
+        <h1 class="fw-bold">
+            <i class="fas fa-clipboard-question text-primary"></i>
+            Health Quiz Center
+        </h1>
+
+        <p class="text-muted">
+            Choose a health topic and test your knowledge.
+        </p>
+
+        <div class="alert alert-info mt-4">
+            <strong>Educational Purpose:</strong>
+            These quizzes are for general health education only and are not medical diagnosis or treatment.
+        </div>
+    </div>
+
+    <div class="row g-4">
+
+        {% for quiz_id, quiz in quizzes.items() %}
+
+        <div class="col-md-6 col-lg-4">
+
+            <div class="card h-100 shadow-sm border-0">
+
+                <div class="card-body text-center p-4">
+
+                    <div class="display-4 mb-3">
+                        {{ quiz.icon }}
+                    </div>
+
+                    <h4 class="fw-bold">
+                        {{ quiz.title }}
+                    </h4>
+
+                    <p class="text-muted">
+                        {{ quiz.description }}
+                    </p>
+
+                    <p class="small text-muted">
+                        {{ quiz.questions|length }} Questions
+                    </p>
+
+                    <a href="{{ url_for('quiz_page', quiz_id=quiz_id) }}"
+                       class="btn btn-primary">
+                        <i class="fas fa-play"></i>
+                        Start Quiz
+                    </a>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        {% endfor %}
+
+    </div>
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,431 @@
+{% extends "base.html" %}
+
+{% block title %}Nearby Hospitals & Location - AI Health Assistant{% endblock %}
+
+{% block content %}
+<div class="location-page-container">
+    <!-- Header -->
+    <div class="location-page-header text-center mb-4">
+        <div class="location-icon-wrapper mb-2">
+            <i class="fas fa-map-location-dot"></i>
+        </div>
+        <h2>Nearby Hospitals & Location</h2>
+        <p class="text-muted">Detect your location or select your city to explore nearby hospitals and healthcare centers</p>
+    </div>
+
+    <!-- Search / Filter Card -->
+    <div class="card location-filter-card mb-4">
+        <div class="card-body p-4">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-5">
+                    <label for="citySelect" class="form-label fw-semibold">
+                        <i class="fas fa-city text-primary me-1"></i>Select City
+                    </label>
+                    <select id="citySelect" class="form-select form-select-lg">
+                        <option value="">-- Choose a City --</option>
+                        {% for city in cities %}
+                        <option value="{{ city }}">{{ city }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="areaInput" class="form-label fw-semibold">
+                        <i class="fas fa-street-view text-info me-1"></i>Area / Locality (Optional)
+                    </label>
+                    <input type="text" id="areaInput" class="form-control form-control-lg" placeholder="e.g. Bandra, Shivaji Nagar">
+                </div>
+                <div class="col-md-3 d-flex gap-2">
+                    <button type="button" id="searchHospBtn" class="btn btn-primary btn-lg flex-fill">
+                        <i class="fas fa-search me-1"></i> Search
+                    </button>
+                    <button type="button" id="detectGpsBtn" class="btn btn-outline-info btn-lg" title="Auto-detect using GPS">
+                        <i class="fas fa-crosshairs"></i> GPS
+                    </button>
+                </div>
+            </div>
+
+            <div id="activeLocAlert" class="alert alert-info d-flex align-items-center justify-content-between mt-3 mb-0" style="display: none !important;">
+                <div>
+                    <i class="fas fa-check-circle text-success me-2"></i>
+                    <strong>Active Location:</strong> <span id="activeLocLabel">None</span>
+                </div>
+                <span class="badge bg-primary" id="hospTotalBadge">0 Hospitals</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Section -->
+    <div class="hospitals-section">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 class="mb-0 fw-bold">
+                <i class="fas fa-hospital-user text-primary me-2"></i>Available Hospitals
+            </h4>
+            <span class="text-muted small" id="hospResultsSummary">Select a city to view hospitals</span>
+        </div>
+
+        <div id="hospitalsGrid" class="row g-4">
+            <div class="col-12 text-center py-5 text-muted">
+                <i class="fas fa-hospital text-muted mb-3" style="font-size: 3rem; opacity: 0.5;"></i>
+                <h5>No location selected yet</h5>
+                <p>Choose your city above or click GPS to find hospitals near you.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.location-page-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+}
+
+.location-icon-wrapper i {
+    font-size: 3rem;
+    color: var(--primary-color);
+}
+
+.location-page-header h2 {
+    color: var(--text-color);
+    font-weight: 700;
+}
+
+.location-filter-card {
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+}
+
+.form-select, .form-control {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: var(--text-color);
+    border-radius: 10px;
+}
+
+.form-select:focus, .form-control:focus {
+    background: rgba(255, 255, 255, 0.25);
+    color: var(--text-color);
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.25rem rgba(76, 175, 80, 0.25);
+}
+
+.form-select option {
+    background: #1e293b;
+    color: #ffffff;
+}
+
+.hospital-card {
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 16px;
+    transition: all 0.3s ease;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.hospital-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+    border-color: var(--primary-color);
+}
+
+.hospital-card-header {
+    padding: 1.25rem 1.25rem 0.5rem;
+}
+
+.hospital-card-header h5 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-color);
+    line-height: 1.35;
+    margin-bottom: 0.25rem;
+}
+
+.hospital-card-body {
+    padding: 0.75rem 1.25rem;
+    flex-grow: 1;
+}
+
+.hospital-card-body p {
+    font-size: 0.88rem;
+    color: var(--text-color);
+    opacity: 0.85;
+    line-height: 1.45;
+    margin-bottom: 0.5rem;
+}
+
+.hospital-meta-tag {
+    font-size: 0.78rem;
+    color: #38bdf8;
+    margin-bottom: 0.35rem;
+}
+
+.hospital-card-footer {
+    padding: 1rem 1.25rem;
+    background: rgba(255, 255, 255, 0.04);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0 0 16px 16px;
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-directions {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: white;
+    border: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.45rem 0.85rem;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.btn-directions:hover {
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.btn-chatbot-link {
+    background: rgba(255, 255, 255, 0.12);
+    color: var(--text-color);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.45rem 0.85rem;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.btn-chatbot-link:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: var(--text-color);
+    transform: translateY(-2px);
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const citySelect = document.getElementById('citySelect');
+    const areaInput = document.getElementById('areaInput');
+    const searchHospBtn = document.getElementById('searchHospBtn');
+    const detectGpsBtn = document.getElementById('detectGpsBtn');
+    const activeLocAlert = document.getElementById('activeLocAlert');
+    const activeLocLabel = document.getElementById('activeLocLabel');
+    const hospTotalBadge = document.getElementById('hospTotalBadge');
+    const hospResultsSummary = document.getElementById('hospResultsSummary');
+    const hospitalsGrid = document.getElementById('hospitalsGrid');
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    async function loadHospitals(city, area = '') {
+        if (!city) {
+            hospitalsGrid.innerHTML = `
+                <div class="col-12 text-center py-5 text-muted">
+                    <i class="fas fa-hospital text-muted mb-3" style="font-size: 3rem; opacity: 0.5;"></i>
+                    <h5>No city selected</h5>
+                    <p>Please select a city to see available hospitals.</p>
+                </div>
+            `;
+            activeLocAlert.style.setProperty('display', 'none', 'important');
+            hospResultsSummary.textContent = 'Select a city to view hospitals';
+            return;
+        }
+
+        hospitalsGrid.innerHTML = `
+            <div class="col-12 text-center py-5 text-muted">
+                <i class="fas fa-spinner fa-spin text-primary mb-3" style="font-size: 3rem;"></i>
+                <h5>Loading hospitals in ${escapeHtml(city)}...</h5>
+            </div>
+        `;
+
+        try {
+            const resp = await fetch(`/nearby-hospitals?city=${encodeURIComponent(city)}&area=${encodeURIComponent(area)}`);
+            const data = await resp.json();
+
+            if (data.success && data.hospitals && data.hospitals.length > 0) {
+                const count = data.hospitals.length;
+                activeLocAlert.style.setProperty('display', 'flex', 'important');
+                activeLocLabel.textContent = area ? `${area}, ${city}` : city;
+                hospTotalBadge.textContent = `${count} Hospitals`;
+                hospResultsSummary.textContent = `Showing ${count} hospital(s) in ${city}${area ? ' (' + area + ')' : ''}`;
+
+                hospitalsGrid.innerHTML = data.hospitals.map(h => {
+                    const mapsQuery = encodeURIComponent(`${h.Hospital} ${h.Address} ${h.City}`);
+                    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
+
+                    return `
+                    <div class="col-md-6 col-lg-4">
+                        <div class="card hospital-card">
+                            <div class="hospital-card-header">
+                                <h5><i class="fas fa-hospital-alt text-danger me-2"></i>${escapeHtml(h.Hospital)}</h5>
+                                <div class="hospital-meta-tag">
+                                    <i class="fas fa-map-pin me-1"></i>${escapeHtml(h.City)}${h.Pincode ? ' - ' + escapeHtml(h.Pincode) : ''}
+                                    ${h.State ? `| <span class="badge bg-secondary">${escapeHtml(h.State)}</span>` : ''}
+                                </div>
+                            </div>
+                            <div class="hospital-card-body">
+                                <p><i class="fas fa-location-dot me-1 text-muted"></i>${escapeHtml(h.Address || 'Address details in directory')}</p>
+                            </div>
+                            <div class="hospital-card-footer">
+                                <a href="${mapsUrl}" target="_blank" rel="noopener" class="btn-directions flex-fill text-center">
+                                    <i class="fas fa-directions me-1"></i>Directions
+                                </a>
+                                <a href="/chatbot" class="btn-chatbot-link flex-fill text-center">
+                                    <i class="fas fa-robot me-1"></i>Ask Bot
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    `;
+                }).join('');
+            } else {
+                activeLocAlert.style.setProperty('display', 'flex', 'important');
+                activeLocLabel.textContent = area ? `${area}, ${city}` : city;
+                hospTotalBadge.textContent = '0 Hospitals';
+                hospResultsSummary.textContent = `No hospitals found in ${city}`;
+
+                hospitalsGrid.innerHTML = `
+                    <div class="col-12 text-center py-5 text-muted">
+                        <i class="fas fa-info-circle text-warning mb-3" style="font-size: 3rem;"></i>
+                        <h5>No hospitals found in database for "${escapeHtml(city)}"</h5>
+                        <p>Try searching for a neighboring city or removing the area filter.</p>
+                    </div>
+                `;
+            }
+        } catch (err) {
+            console.error('Error fetching hospitals:', err);
+            hospitalsGrid.innerHTML = `
+                <div class="col-12 text-center py-5 text-danger">
+                    <i class="fas fa-exclamation-triangle mb-3" style="font-size: 3rem;"></i>
+                    <h5>Failed to load hospital data</h5>
+                    <p>Please check your connection and try again.</p>
+                </div>
+            `;
+        }
+    }
+
+    // Search button
+    searchHospBtn.addEventListener('click', function() {
+        const city = citySelect.value.trim();
+        const area = areaInput.value.trim();
+        if (!city) {
+            alert('Please select a city first.');
+            return;
+        }
+        localStorage.setItem('user_city', city);
+        localStorage.setItem('user_area', area);
+        loadHospitals(city, area);
+    });
+
+    // City change triggers auto-load
+    citySelect.addEventListener('change', function() {
+        if (this.value) {
+            const area = areaInput.value.trim();
+            localStorage.setItem('user_city', this.value);
+            loadHospitals(this.value, area);
+        }
+    });
+
+    // GPS Detect button
+    detectGpsBtn.addEventListener('click', function() {
+        if (!navigator.geolocation) {
+            alert('Geolocation is not supported by your browser.');
+            return;
+        }
+
+        detectGpsBtn.disabled = true;
+        detectGpsBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+        navigator.geolocation.getCurrentPosition(
+            async function(position) {
+                try {
+                    const response = await fetch('/location', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude
+                        })
+                    });
+                    const locData = await response.json();
+                    if (locData.success && locData.city) {
+                        let matched = false;
+                        for (let i = 0; i < citySelect.options.length; i++) {
+                            if (citySelect.options[i].value.toLowerCase() === locData.city.toLowerCase()) {
+                                citySelect.selectedIndex = i;
+                                matched = true;
+                                break;
+                            }
+                        }
+                        if (!matched) {
+                            const opt = document.createElement('option');
+                            opt.value = locData.city;
+                            opt.textContent = locData.city;
+                            citySelect.appendChild(opt);
+                            citySelect.value = locData.city;
+                        }
+
+                        if (locData.area) {
+                            areaInput.value = locData.area;
+                        }
+
+                        const currentCity = citySelect.value || locData.city;
+                        const currentArea = locData.area || '';
+                        localStorage.setItem('user_city', currentCity);
+                        localStorage.setItem('user_area', currentArea);
+                        loadHospitals(currentCity, currentArea);
+                    } else {
+                        alert(locData.error || 'Could not determine your city from GPS coordinates. Please select manually.');
+                    }
+                } catch (err) {
+                    console.error('GPS detect error:', err);
+                    alert('Error connecting to location service. Please pick your city manually.');
+                } finally {
+                    detectGpsBtn.disabled = false;
+                    detectGpsBtn.innerHTML = '<i class="fas fa-crosshairs"></i> GPS';
+                }
+            },
+            function(err) {
+                console.error('Geolocation permission denied:', err);
+                alert('Location permission was denied or unavailable. Please choose your city from the dropdown.');
+                detectGpsBtn.disabled = false;
+                detectGpsBtn.innerHTML = '<i class="fas fa-crosshairs"></i> GPS';
+            },
+            { timeout: 10000 }
+        );
+    });
+
+    // Auto-load saved location from previous visits
+    const savedCity = localStorage.getItem('user_city');
+    const savedArea = localStorage.getItem('user_area') || '';
+    if (savedCity) {
+        citySelect.value = savedCity;
+        areaInput.value = savedArea;
+        loadHospitals(savedCity, savedArea);
+    }
+});
+</script>
+{% endblock %}
+

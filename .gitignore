@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.hf_cache/
+.ipynb_checkpoints/
+.vscode/
+instance/
+health care chatbot new/
+app_root_backup.py
+*.tmp
+.env

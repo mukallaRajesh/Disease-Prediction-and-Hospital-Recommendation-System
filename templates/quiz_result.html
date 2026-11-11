@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}Quiz Result{% endblock %}
+
+{% block content %}
+
+<div class="container py-5">
+
+
+<div class="text-center">
+
+    <div class="mb-4">
+        <i class="fas fa-trophy text-warning" style="font-size: 70px;"></i>
+    </div>
+
+    <h1 class="fw-bold">
+        Quiz Completed!
+    </h1>
+
+    <h3 class="text-primary mt-3">
+        {{ quiz.title }}
+    </h3>
+
+    <p class="text-muted mt-3">
+        You have completed the {{ quiz.title }}.
+    </p>
+
+    <div class="card shadow-sm border-0 mx-auto mt-4" style="max-width: 500px;">
+
+        <div class="card-body p-5">
+
+            <h5 class="text-muted mb-3">
+                Your Score
+            </h5>
+
+            <div class="display-3 fw-bold text-primary">
+                {{ score }}/{{ total }}
+            </div>
+
+            <div class="mt-3">
+                <span class="badge bg-success fs-6 px-4 py-2">
+                    {{ percentage }}%
+                </span>
+            </div>
+
+            <hr class="my-4">
+
+            <h5 class="fw-bold">
+                {{ result }}
+            </h5>
+
+        </div>
+
+    </div>
+
+    <div class="mt-5">
+
+        <a href="{{ url_for('quiz_center') }}"
+           class="btn btn-primary btn-lg px-4">
+            <i class="fas fa-clipboard-question me-2"></i>
+            Quiz Center
+        </a>
+
+        <a href="{{ url_for('quiz_page', quiz_id=quiz_id) }}"
+           class="btn btn-outline-primary btn-lg px-4 ms-2">
+            <i class="fas fa-redo me-2"></i>
+            Retake Quiz
+        </a>
+
+    </div>
+
+</div>
+
+
+</div>
+
+{% endblock %}
