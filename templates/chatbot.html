@@ -4,8 +4,8 @@
 
 {% block content %}
 <div class="main-container d-flex justify-content-center align-items-center">
-    <model-viewer id="chatbot-avatar" src="{{ url_for('static', filename='avatar.glb') }}" ar ar-modes="webxr scene-viewer quick-look" camera-controls touch-action="pan-y" poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" shadow-intensity="1" animation-name="Idle" autoplay>
-    </model-viewer>
+    <img id="chatbot-avatar" src="{{ url_for('static', filename='chatbot.jpg') }}" alt="AI Health Assistant">
+
     <div class="chatbot-card">
         <div class="chatbot-header">
             <h2>AI HEALTH ASSISTANT CHATBOT</h2>
@@ -14,20 +14,31 @@
         
         <div class="chat-messages" id="chatMessages">
             {% for message in chat_history %}
-            <div class="message {% if message.role == 'user' %}user-message{% else %}bot-message{% endif %}">
-                <div class="message-content">
-                    {{ message.content }}
+                {% if message.user is defined %}
+                <div class="message user-message">
+                    <div class="message-content">{{ message.user }}</div>
                 </div>
-            </div>
+                {% if message.bot is defined %}
+                <div class="message bot-message">
+                    <div class="message-content">{{ message.bot }}</div>
+                </div>
+                {% endif %}
+                {% elif message.role is defined %}
+                <div class="message {% if message.role == 'user' %}user-message{% else %}bot-message{% endif %}">
+                    <div class="message-content">{{ message.content }}</div>
+                </div>
+                {% endif %}
             {% endfor %}
         </div>
 
         <form id="chatForm" class="chat-input-form">
             <div class="input-group">
                 <input type="text" id="userInput" class="form-control" placeholder="Type your question here..." required>
+
                 <button type="button" id="mic-btn" class="btn btn-secondary mic-btn">
                     <i class="fas fa-microphone"></i>
                 </button>
+
                 <button type="submit" class="send-btn">
                     <i class="fas fa-paper-plane"></i>
                 </button>
@@ -43,8 +54,10 @@
     }
 
     #chatbot-avatar {
-        width: 400px; /* Adjust as needed */
-        height: 600px; /* Adjust as needed */
+        width: 400px;
+        height: 600px;
+        object-fit: cover;
+        border-radius: 20px;
     }
 
     .chatbot-container {
@@ -73,8 +86,6 @@
         text-align: center;
         margin-bottom: 2rem;
     }
-
-    
 
     .chatbot-header i {
         font-size: 3rem;
@@ -126,7 +137,9 @@
     }
 
     .message-content {
-        line-height: 1.5;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        word-break: break-word;
     }
 
     .chat-input-form {
@@ -197,13 +210,13 @@
             opacity: 0;
             transform: translateY(10px);
         }
+
         to {
             opacity: 1;
             transform: translateY(0);
         }
     }
 
-    /* Scrollbar styling */
     .chat-messages::-webkit-scrollbar {
         width: 8px;
     }
@@ -229,15 +242,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const userInput = document.getElementById('userInput');
     const chatMessages = document.getElementById('chatMessages');
     const micBtn = document.getElementById('mic-btn');
-    const avatar = document.querySelector('model-viewer');
 
     function setAnimation(name) {
-        avatar.animationName = name;
-        avatar.play({ repetitions: Infinity });
+        return;
     }
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     let recognition;
+
     if (SpeechRecognition) {
         recognition = new SpeechRecognition();
         recognition.continuous = false;
@@ -275,32 +287,57 @@ document.addEventListener('DOMContentLoaded', function() {
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
+    function formatMessageText(text) {
+        if (!text) return '';
+        let escaped = text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+        escaped = escaped.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        escaped = escaped.replace(/^[\*\-]\s+(.+)$/gm, '• $1');
+        return escaped;
+    }
+
     function addMessage(content, isUser = false) {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
-        messageDiv.innerHTML = `<div class="message-content">${content}</div>`;
+        const formatted = isUser ? document.createTextNode(content).textContent : formatMessageText(content);
+        messageDiv.innerHTML = `<div class="message-content">${formatted}</div>`;
         chatMessages.appendChild(messageDiv);
         scrollToBottom();
     }
 
     function speakText(text) {
-        const utterance = new SpeechSynthesisUtterance(text);
+        if (!('speechSynthesis' in window)) return;
+        const cleanText = text
+            .replace(/[\*\#\_]/g, '')
+            .replace(/•/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+
         utterance.onstart = () => {
             setAnimation('Talk');
         };
+
         utterance.onend = () => {
             setAnimation('Idle');
         };
+
         speechSynthesis.speak(utterance);
     }
 
     chatForm.addEventListener('submit', async function(e) {
         e.preventDefault();
+
         const question = userInput.value.trim();
+
         if (!question) return;
 
         addMessage(question, true);
+
         userInput.value = '';
+
         setAnimation('Thinking');
 
         try {
@@ -309,10 +346,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ question: question })
+                body: JSON.stringify({
+                    question: question
+                })
             });
 
             const data = await response.json();
+
             if (data.error) {
                 addMessage('Sorry, I encountered an error. Please try again.');
                 setAnimation('Idle');
@@ -320,6 +360,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 addMessage(data.response);
                 speakText(data.response);
             }
+
         } catch (error) {
             addMessage('Sorry, I encountered an error. Please try again.');
             setAnimation('Idle');
@@ -330,4 +371,5 @@ document.addEventListener('DOMContentLoaded', function() {
     setAnimation('Idle');
 });
 </script>
+
 {% endblock %}
