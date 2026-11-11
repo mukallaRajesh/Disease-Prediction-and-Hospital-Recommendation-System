@@ -23,17 +23,14 @@ COPY . .
 # Create necessary directories
 RUN mkdir -p instance
 
-# Expose port
-EXPOSE 5000
-
 # Set environment variables
 ENV FLASK_APP=app.py
 ENV FLASK_ENV=production
 ENV PYTHONUNBUFFERED=1
+ENV PORT=5000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:5000/ || exit 1
+# Expose port
+EXPOSE 5000
 
-# Run the application
-CMD ["python", "app.py"] 
+# Run with Gunicorn on the dynamically assigned PORT
+CMD ["sh", "-c", "gunicorn app:app --bind 0.0.0.0:${PORT:-5000} --workers 1 --threads 4 --timeout 120"]

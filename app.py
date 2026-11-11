@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import logging
 import sqlite3
@@ -6,6 +7,18 @@ from pathlib import Path
 from collections import Counter
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+
+import numpy as np
+
+# Ensure unpickling compatibility between NumPy 1.x and 2.x
+try:
+    import numpy._core
+except ModuleNotFoundError:
+    try:
+        import numpy.core
+        sys.modules["numpy._core"] = numpy.core
+    except Exception:
+        pass
 
 import pandas as pd
 import joblib
