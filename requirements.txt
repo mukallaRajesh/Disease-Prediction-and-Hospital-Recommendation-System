@@ -1,7 +1,7 @@
+
 flask==3.0.0
 sentence-transformers==2.2.2
 pandas==2.1.1
-ollama==0.1.6
 python-dotenv==1.0.0
 numpy==1.24.3
 scikit-learn==1.6.1
@@ -10,7 +10,11 @@ tqdm==4.66.1
 werkzeug==3.0.1
 huggingface-hub==0.16.4
 torch==2.0.1
-transformers==4.21.3
+transformers==4.30.2
+tokenizers==0.13.3
 setuptools==68.0.0
 wheel==0.41.0
+google-genai
+gunicorn
+
 
