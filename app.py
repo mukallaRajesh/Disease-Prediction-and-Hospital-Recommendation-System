@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 import json
 import logging
 import sqlite3
@@ -77,7 +78,7 @@ logging.basicConfig(
 # Read the Gemini API key from the deployment environment.
 # Set GEMINI_API_KEY in Render; never hard-code the key here.
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 
 try:
     if GEMINI_API_KEY:
@@ -199,26 +200,54 @@ try:
         .fillna("")
     )
 
-    sentence_model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
+    # Initialize SentenceTransformer with local snapshot check to prevent hanging
+    sentence_model = None
+    try:
+        snapshot_matches = list((CACHE_DIR / "models--sentence-transformers--paraphrase-MiniLM-L6-v2" / "snapshots").glob("*")) if (CACHE_DIR / "models--sentence-transformers--paraphrase-MiniLM-L6-v2" / "snapshots").exists() else []
+        if snapshot_matches:
+            try:
+                os.environ["TRANSFORMERS_OFFLINE"] = "1"
+                os.environ["HF_HUB_OFFLINE"] = "1"
+                sentence_model = SentenceTransformer(str(snapshot_matches[0]))
+            except Exception:
+                pass
+        if sentence_model is None:
+            os.environ.pop("TRANSFORMERS_OFFLINE", None)
+            os.environ.pop("HF_HUB_OFFLINE", None)
+            sentence_model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
+    except Exception as e:
+        logging.warning(f"Could not load SentenceTransformer: {e}. Fallback search will be used.")
 
     embeddings_file = BASE_DIR / "question_embeddings.pkl"
+    question_embeddings_matrix = None
     if embeddings_file.exists():
         logging.info("Loading precomputed question embeddings...")
         loaded_emb = joblib.load(embeddings_file)
-        if isinstance(loaded_emb, (list, tuple)):
-            chatbot_df["question_embedding"] = list(loaded_emb)
-        else:
-            chatbot_df["question_embedding"] = [e for e in loaded_emb]
-    else:
+        if isinstance(loaded_emb, np.ndarray):
+            question_embeddings_matrix = loaded_emb.astype(np.float32)
+        elif isinstance(loaded_emb, (list, tuple)):
+            question_embeddings_matrix = np.array(loaded_emb, dtype=np.float32)
+
+        norms = np.linalg.norm(question_embeddings_matrix, axis=1, keepdims=True)
+        norms[norms == 0] = 1e-9
+        question_embeddings_matrix = question_embeddings_matrix / norms
+        chatbot_df["question_embedding"] = list(question_embeddings_matrix)
+    elif sentence_model is not None:
         logging.info("Encoding question embeddings...")
         embeddings = sentence_model.encode(
             chatbot_df["User Question"].tolist(),
             batch_size=64,
-            convert_to_tensor=True,
-            show_progress_bar=True
+            convert_to_numpy=True,
+            show_progress_bar=False
         )
-        chatbot_df["question_embedding"] = [emb for emb in embeddings]
-        joblib.dump(chatbot_df["question_embedding"], embeddings_file)
+        norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+        norms[norms == 0] = 1e-9
+        question_embeddings_matrix = (embeddings / norms).astype(np.float32)
+        chatbot_df["question_embedding"] = list(question_embeddings_matrix)
+        try:
+            joblib.dump(question_embeddings_matrix, embeddings_file)
+        except Exception:
+            pass
 
     chatbot_df["Answer"] = (
         chatbot_df["AI Response"]
@@ -2552,47 +2581,46 @@ def chatbot():
     )
 
 
-def find_most_similar_answer(
-    user_question
-):
+def fallback_keyword_search(user_question):
+    stop_words = {
+        'what', 'is', 'the', 'of', 'in', 'and', 'to', 'a', 'how', 'do', 'you',
+        'for', 'when', 'should', 'i', 'or', 'are', 'can', 'with', 'my', 'me',
+        'have', 'has', 'had', 'does', 'did', 'be', 'at', 'by', 'this', 'that'
+    }
+    tokens = set(re.findall(r'\w+', user_question.lower())) - stop_words
+    if not tokens:
+        tokens = set(re.findall(r'\w+', user_question.lower()))
 
-    user_question_embedding = (
-        sentence_model.encode(
-            user_question,
-            convert_to_tensor=True
-        )
-    )
+    best_score = -1
+    best_idx = 0
+    for idx, q_text in enumerate(chatbot_df["User Question"]):
+        q_tokens = set(re.findall(r'\w+', str(q_text).lower()))
+        overlap = len(tokens & q_tokens)
+        if overlap > best_score:
+            best_score = overlap
+            best_idx = idx
 
-    similarities = [
+    row = chatbot_df.iloc[best_idx]
+    return row["User Question"], row["Answer"]
 
-        util.pytorch_cos_sim(
-            user_question_embedding,
-            emb
-        ).item()
 
-        for emb
-        in chatbot_df[
-            "question_embedding"
-        ]
-    ]
+def find_most_similar_answer(user_question):
+    if sentence_model is not None and question_embeddings_matrix is not None:
+        try:
+            q_emb = sentence_model.encode(user_question, convert_to_numpy=True)
+            q_norm = float(np.linalg.norm(q_emb))
+            if q_norm > 0:
+                q_emb = q_emb / q_norm
+            sims = np.dot(question_embeddings_matrix, q_emb)
+            best_idx = int(np.argmax(sims))
+            best_score = float(sims[best_idx])
+            if best_score >= 0.35:
+                row = chatbot_df.iloc[best_idx]
+                return row["User Question"], row["Answer"]
+        except Exception as e:
+            logging.warning(f"Semantic search error: {e}. Falling back to keyword search.")
 
-    most_similar_idx = similarities.index(
-        max(similarities)
-    )
-
-    most_similar_row = chatbot_df.iloc[
-        most_similar_idx
-    ]
-
-    return (
-        most_similar_row[
-            "User Question"
-        ],
-
-        most_similar_row[
-            "Answer"
-        ]
-    )
+    return fallback_keyword_search(user_question)
 
 
 def generate_gemini_response(
@@ -2602,96 +2630,71 @@ def generate_gemini_response(
     city="",
     area=""
 ):
+    if gemini_client is None:
+        return relevant_answer
+
+    history_lines = []
+    if isinstance(chat_history, list):
+        for entry in chat_history[-6:]:
+            if isinstance(entry, dict):
+                u = entry.get('user') or entry.get('content') or ''
+                b = entry.get('bot') or ''
+                if u:
+                    history_lines.append(f"User: {u}")
+                if b:
+                    history_lines.append(f"Bot: {b}")
+
+    latest_q = ''
+    if chat_history and isinstance(chat_history[-1], dict):
+        latest_q = chat_history[-1].get('user', '') or chat_history[-1].get('content', '')
 
     prompt = (
-        "You are a professional healthcare chatbot. "
+        "You are a professional healthcare assistant. "
         "Answer the user's healthcare question clearly, "
         "concisely, and professionally.\n\n"
     )
 
     if city:
-        if area:
-            prompt += f"User's specified location: {area}, {city}\n\n"
-        else:
-            prompt += f"User's specified location: {city}\n\n"
+        loc = f"{area}, {city}" if area else city
+        prompt += f"User's specified location: {loc}\n\n"
+
+    if history_lines:
+        prompt += "Conversation History:\n" + "\n".join(history_lines) + "\n\n"
 
     prompt += (
-        "Conversation History:\n"
-    )
-
-    for entry in chat_history:
-
-        prompt += (
-            f"User: {entry['user']}\n"
-            f"Bot: {entry['bot']}\n"
-        )
-
-    prompt += (
-
-        f"\nUser's latest question: "
-        f"{chat_history[-1]['user']}\n\n"
-
-        f"Relevant healthcare question: "
-        f"{relevant_question}\n\n"
-
-        f"Relevant healthcare information: "
-        f"{relevant_answer}\n\n"
-
+        f"User's latest question: {latest_q}\n\n"
+        f"Relevant healthcare question: {relevant_question}\n\n"
+        f"Relevant healthcare information: {relevant_answer}\n\n"
         "Instructions:\n"
-
         "- Answer directly based on the relevant healthcare information.\n"
-
-        "- Keep the response concise and useful.\n"
-
-        "- Use simple language.\n"
-
+        "- Keep the response concise, compassionate, and helpful.\n"
+        "- Use simple, easy-to-understand language.\n"
         "- Respond in 2-3 clear points when appropriate.\n"
-
-        "- Do not unnecessarily repeat the question.\n"
-
-        "- Do not invent medical information.\n"
-
-        "- If the user asks about local healthcare, clinics, or hospitals, refer to their location.\n"
-
-        "- If the information is insufficient, clearly say so.\n"
-
-        "- For serious or emergency symptoms, advise the user "
-        "to seek professional medical care immediately.\n"
-
-        "- Mention a reference URL if one is available "
-        "in the provided information.\n\n"
-
+        "- Do not unnecessarily repeat the user's question.\n"
+        "- Do not invent unverified medical facts.\n"
+        "- For serious or emergency symptoms, advise the user to seek immediate professional medical care.\n\n"
         "Bot:"
     )
 
-    if gemini_client is None:
+    candidate_models = [GEMINI_MODEL, "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
+    seen = set()
+    candidate_models = [m for m in candidate_models if m and not (m in seen or seen.add(m))]
 
-        return relevant_answer
-
-    try:
-
-        response = (
-            gemini_client
-            .models
-            .generate_content(
-                model=GEMINI_MODEL,
+    for model_name in candidate_models:
+        try:
+            response = gemini_client.models.generate_content(
+                model=model_name,
                 contents=prompt
             )
-        )
+            if response and getattr(response, "text", None):
+                text = response.text.strip()
+                if text:
+                    return text
+        except Exception as e:
+            logging.warning(f"Gemini API model {model_name} failed: {e}")
+            continue
 
-        if response.text:
-
-            return response.text.strip()
-
-        return relevant_answer
-
-    except Exception as e:
-
-        logging.error(
-            f"Gemini API error: {e}"
-        )
-
-        return relevant_answer
+    return relevant_answer
 
 
 @app.route(
@@ -2700,105 +2703,67 @@ def generate_gemini_response(
 )
 @login_required
 def chatbot_ask():
-
     try:
+        data = request.get_json(silent=True) or {}
+        question = data.get("question", "")
+        if not question or not str(question).strip():
+            return jsonify({"error": "No question provided"}), 400
 
-        data = request.get_json(
-            silent=True
-        )
-
-        if not data:
-
-            return jsonify({
-                "error":
-                "Invalid request data"
-            }), 400
-
-        question = data.get(
-            "question"
-        )
-
-        if not question:
-
-            return jsonify({
-                "error":
-                "No question provided"
-            }), 400
-
-        question = question.strip()
-
-        if not question:
-
-            return jsonify({
-                "error":
-                "No question provided"
-            }), 400
-
+        question = str(question).strip()
         city = str(data.get("city", "")).strip()
         area = str(data.get("area", "")).strip()
 
-        if "chat_history" not in session:
-
+        if "chat_history" not in session or not isinstance(session["chat_history"], list):
             session["chat_history"] = []
 
-        relevant_question, relevant_answer = (
-            find_most_similar_answer(
-                question
+        try:
+            relevant_question, relevant_answer = find_most_similar_answer(question)
+        except Exception as sim_err:
+            logging.error(f"Error finding similar answer: {sim_err}")
+            relevant_question = question
+            relevant_answer = (
+                "For your safety, if you are experiencing severe, sudden, or persistent symptoms, "
+                "please seek professional medical care promptly. Maintain hydration and rest while monitoring your condition."
             )
-        )
 
-        session[
-            "chat_history"
-        ].append({
-
-            "user":
-            question,
-
-            "bot":
-            relevant_answer
+        session["chat_history"].append({
+            "user": question,
+            "bot": relevant_answer
         })
 
-        enhanced_answer = (
-            generate_gemini_response(
-
-                session[
-                    "chat_history"
-                ],
-
+        try:
+            enhanced_answer = generate_gemini_response(
+                session["chat_history"],
                 relevant_question,
-
                 relevant_answer,
-
                 city=city,
-
                 area=area
             )
-        )
+        except Exception as gem_err:
+            logging.warning(f"generate_gemini_response error: {gem_err}")
+            enhanced_answer = relevant_answer
 
-        session[
-            "chat_history"
-        ][-1]["bot"] = (
-            enhanced_answer
-        )
+        session["chat_history"][-1]["bot"] = enhanced_answer[:1000]
+
+        # Bound session history to prevent browser cookie 4KB overflow
+        if len(session["chat_history"]) > 4:
+            session["chat_history"] = session["chat_history"][-4:]
 
         session.modified = True
 
         return jsonify({
-
-            "response":
-            enhanced_answer
+            "response": enhanced_answer,
+            "matched_question": relevant_question
         })
 
     except Exception as e:
-
-        logging.error(
-            f"Error in chatbot: {e}"
-        )
-
+        logging.exception(f"Unhandled error in chatbot_ask: {e}")
         return jsonify({
-            "error":
-            str(e)
-        }), 500
+            "response": (
+                "I apologize, but I encountered an unexpected issue while retrieving that information. "
+                "For your health and wellness, please consult a qualified healthcare provider or local clinic if symptoms persist."
+            )
+        })
 
 
 # ============================================================

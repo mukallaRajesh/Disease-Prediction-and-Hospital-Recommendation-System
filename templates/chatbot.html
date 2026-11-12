@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="main-container d-flex justify-content-center align-items-center">
-    <img id="chatbot-avatar" src="{{ url_for('static', filename='chatbot.jpg') }}" alt="AI Health Assistant">
+    <img id="chatbot-avatar" src="{{ url_for('static', filename='chatbot.jpg') }}" alt="AI Health Assistant" onerror="this.onerror=null; this.src='{{ url_for('static', filename='avatar.png') }}';">
 
     <div class="chatbot-card">
         <div class="chatbot-header">
@@ -54,10 +54,24 @@
     }
 
     #chatbot-avatar {
-        width: 400px;
-        height: 600px;
+        width: 360px;
+        height: 540px;
         object-fit: cover;
         border-radius: 20px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    }
+
+    @media (max-width: 992px) {
+        .main-container {
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #chatbot-avatar {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+        }
     }
 
     .chatbot-container {
@@ -351,18 +365,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 })
             });
 
+            if (response.status === 401 || response.redirected) {
+                window.location.href = '/login';
+                return;
+            }
+
             const data = await response.json();
 
-            if (data.error) {
-                addMessage('Sorry, I encountered an error. Please try again.');
-                setAnimation('Idle');
-            } else {
+            if (data.response) {
                 addMessage(data.response);
                 speakText(data.response);
+            } else if (data.error) {
+                addMessage(data.error);
+            } else {
+                addMessage('Sorry, I encountered an issue. Please try rephrasing your question.');
             }
 
         } catch (error) {
-            addMessage('Sorry, I encountered an error. Please try again.');
+            console.error('Chatbot error:', error);
+            addMessage('Sorry, I had trouble connecting. Please check your connection and try again.');
+        } finally {
             setAnimation('Idle');
         }
     });
